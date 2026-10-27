@@ -14,7 +14,8 @@ class Item:
     time: str | None = None            # "HH:MM" (24h); None = all day
     duration_min: int | None = None
     all_day: bool = False
-    reminders_min_before: list[int] = field(default_factory=lambda: [10])
+    reminders_min_before: list[int] = field(default_factory=lambda: [30])
+    morning_reminder: bool = True      # 9:00 AM heads-up on the day of the event
     notes: str = ""
     status: str = "pending"            # "pending" | "done"
     recurrence: str | None = None      # reserved for v2

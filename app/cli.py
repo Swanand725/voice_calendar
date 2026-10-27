@@ -45,8 +45,8 @@ def main(argv=None) -> None:
     a.add_argument("title")
     a.add_argument("--date", default="today", help="YYYY-MM-DD, today, or tomorrow")
     a.add_argument("--time", help="HH:MM (24h); leave out for all day")
-    a.add_argument("--remind", type=int, nargs="*", default=[10],
-                   help="minutes before to remind (default: 10)")
+    a.add_argument("--remind", type=int, nargs="*", default=[30],
+                   help="minutes before to remind (default: 30)")
 
     l = sub.add_parser("list", help="list items")
     l.add_argument("--date", help="YYYY-MM-DD, today, or tomorrow")

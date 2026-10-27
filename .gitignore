@@ -159,6 +159,7 @@ ENV/
 env.bak/
 venv.bak/
 data/calendar.json
+data/*.json
 
 # Spyder project settings
 .spyderproject
