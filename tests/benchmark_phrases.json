@@ -1,0 +1,51 @@
+[
+  {"phrase": "I have a doctor's appointment at 5 tomorrow.", "action": "add", "title": "doctor's appointment", "date": "tomorrow", "time": "17:00"},
+  {"phrase": "I have an assignment due on October 5th called \"painpoints assessment\"", "action": "add", "title": "painpoints assessment", "date": "md:10-05", "time": null},
+  {"phrase": "Could you add a task called \"testing my Jarvis\" for 6 on Sunday.", "action": "add", "title": "testing my Jarvis", "date": "next:sunday", "time": "18:00"},
+  {"phrase": "Delete the \"painpoints assessment\" task.", "action": "delete", "title": "painpoints assessment", "date": null, "time": null},
+  {"phrase": "Mark the doctor's appointment as done.", "action": "complete", "title": "doctor's appointment", "date": null, "time": null},
+  {"phrase": "Check the Jarvis assignment.", "action": "complete", "title": "Jarvis", "date": null, "time": null},
+  {"phrase": "What's on my schedule for today?", "action": "list", "title": null, "date": "today", "time": null},
+  {"phrase": "What's on my schedule for tomorrow?", "action": "list", "title": null, "date": "tomorrow", "time": null},
+  {"phrase": "What's on my schedule for Sunday?", "action": "list", "title": null, "date": "next:sunday", "time": null},
+  {"phrase": "What's on my schedule for October 5th?", "action": "list", "title": null, "date": "md:10-05", "time": null},
+  {"phrase": "Give me my schedule for today.", "action": "list", "title": null, "date": "today", "time": null},
+  {"phrase": "When is the \"Painpoints assement\" assignment due?", "action": "info", "title": "painpoints assessment", "date": null, "time": null},
+  {"phrase": "What time is the Jarvis task due?", "action": "info", "title": "Jarvis", "date": null, "time": null},
+  {"phrase": "How much time before my doctor's appointment?", "action": "info", "title": "doctor's appointment", "date": null, "time": null},
+
+  {"phrase": "Remind me to do my homework tomorrow at 7 pm.", "action": "add", "title": "homework", "date": "tomorrow", "time": "19:00"},
+  {"phrase": "Add a dentist appointment on Friday at 2:30 pm.", "action": "add", "title": "dentist appointment", "date": "next:friday", "time": "14:30"},
+  {"phrase": "Schedule a team meeting for 10 am on Monday.", "action": "add", "title": "team meeting", "date": "next:monday", "time": "10:00"},
+  {"phrase": "Put gym on my calendar today at 6.", "action": "add", "title": "gym", "date": "today", "time": "18:00"},
+  {"phrase": "Add lunch with Sam on Saturday at noon.", "action": "add", "title": "lunch with Sam", "date": "next:saturday", "time": "12:00"},
+  {"phrase": "I have a project deadline on November 15th.", "action": "add", "title": "project deadline", "date": "md:11-15", "time": null},
+  {"phrase": "Add a call with my advisor at 9 am tomorrow.", "action": "add", "title": "call with my advisor", "date": "tomorrow", "time": "09:00"},
+  {"phrase": "Add yoga at 7 in the morning on Thursday.", "action": "add", "title": "yoga", "date": "next:thursday", "time": "07:00"},
+  {"phrase": "Put an exam on December 3rd at 1 pm.", "action": "add", "title": "exam", "date": "md:12-03", "time": "13:00"},
+  {"phrase": "Add pick up package in 2 days at 4.", "action": "add", "title": "pick up package", "date": "+2", "time": "16:00"},
+  {"phrase": "Remind me to call mom.", "action": "add", "title": "call mom", "date": null, "time": null},
+  {"phrase": "um can you like add a haircut for friday at four", "action": "add", "title": "haircut", "date": "next:friday", "time": "16:00"},
+  {"phrase": "Add dentist tomorrow 3 pm", "action": "add", "title": "dentist", "date": "tomorrow", "time": "15:00"},
+  {"phrase": "Schedule an oil change Monday at 8:30 am.", "action": "add", "title": "oil change", "date": "next:monday", "time": "08:30"},
+
+  {"phrase": "Cancel my dentist appointment.", "action": "delete", "title": "dentist appointment", "date": null, "time": null},
+  {"phrase": "Remove the team meeting.", "action": "delete", "title": "team meeting", "date": null, "time": null},
+  {"phrase": "Get rid of the gym session.", "action": "delete", "title": "gym", "date": null, "time": null},
+
+  {"phrase": "I finished my homework.", "action": "complete", "title": "homework", "date": null, "time": null},
+  {"phrase": "Check off the exam prep.", "action": "complete", "title": "exam prep", "date": null, "time": null},
+  {"phrase": "Mark the project deadline as done.", "action": "complete", "title": "project deadline", "date": null, "time": null},
+
+  {"phrase": "Move the dentist appointment to 4 pm.", "action": "update", "title": "dentist appointment", "date": null, "time": "16:00"},
+  {"phrase": "Reschedule the team meeting to Wednesday.", "action": "update", "title": "team meeting", "date": "next:wednesday", "time": null},
+  {"phrase": "Change the gym session to tomorrow at 7 am.", "action": "update", "title": "gym", "date": "tomorrow", "time": "07:00"},
+
+  {"phrase": "Show me everything on Friday.", "action": "list", "title": null, "date": "next:friday", "time": null},
+  {"phrase": "Anything scheduled for November 15th?", "action": "list", "title": null, "date": "md:11-15", "time": null},
+  {"phrase": "Do I have anything tomorrow?", "action": "list", "title": null, "date": "tomorrow", "time": null},
+  {"phrase": "List my tasks.", "action": "list", "title": null, "date": null, "time": null},
+
+  {"phrase": "When is my exam?", "action": "info", "title": "exam", "date": null, "time": null},
+  {"phrase": "How long until the team meeting?", "action": "info", "title": "team meeting", "date": null, "time": null}
+]
