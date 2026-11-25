@@ -15,10 +15,11 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import date
 
+from . import config
 from .checks import finalize
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-DEFAULT_MODEL = "llama3.2:3b"
+DEFAULT_MODEL = config.get("model")
 
 ACTIONS = ["add", "delete", "update", "complete", "list", "info"]
 
@@ -89,7 +90,7 @@ def ask(model: str, system: str, phrase: str):
         "stream": False,
         "format": SCHEMA,
         "options": {"temperature": 0},
-        "keep_alive": "30m",
+        "keep_alive": config.keep_alive_value(),
     }
     req = urllib.request.Request(
         OLLAMA_URL, data=json.dumps(body).encode("utf-8"),

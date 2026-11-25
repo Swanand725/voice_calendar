@@ -9,8 +9,11 @@ Rules it follows:
   saved before every change (data/backups/, newest 20 kept).
 - Short answers ("yes", "no", a number, "undo") are handled here, without the model.
 """
+import json
+import os
 import re
 import shutil
+from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -23,6 +26,8 @@ MATCH_MIN = 0.6          # how similar a title must be to count as a match
 CLOSE_MIN = 0.4          # ...to be offered as "closest"
 TIE_MARGIN = 0.05        # items this close to the best score count as the same match
 BACKUPS_KEPT = 20
+UNDO_KEEP = 30                  # how many changes can be undone
+UNDO_MAX_AGE = timedelta(hours=24)   # older changes are left alone
 
 YES = {"yes", "y", "yeah", "yep", "yup", "sure", "ok", "okay", "do it", "go ahead",
        "please do", "confirm"}
@@ -167,7 +172,8 @@ class Assistant:
         self.now_fn = now_fn
         self.logbook = logbook
         self.pending = None          # a question we're waiting for an answer to
-        self.undo_stack = []         # functions that reverse the last changes
+        self.undo_path = self.path.with_name(f"{self.path.stem}.undo.json")
+        self.undo_stack = self._load_undo()   # saved to disk, so undo works after the window closes
         self._result = None
 
     # ----------------------------------------------------------- entry point
@@ -319,11 +325,52 @@ class Assistant:
         for old in sorted(folder.glob(f"{self.path.stem}-*.json"))[:-BACKUPS_KEPT]:
             old.unlink()
 
+    def _load_undo(self):
+        try:
+            data = json.loads(self.undo_path.read_text(encoding="utf-8"))
+            return data if isinstance(data, list) else []
+        except (OSError, ValueError):
+            return []
+
+    def _save_undo(self):
+        self.undo_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.undo_path.with_name(self.undo_path.name + ".tmp")
+        tmp.write_text(json.dumps(self.undo_stack[-UNDO_KEEP:]), encoding="utf-8")
+        os.replace(tmp, self.undo_path)
+
+    def _push_undo(self, entry):
+        entry["ts"] = self.now_fn().isoformat(timespec="seconds")
+        self.undo_stack.append(entry)
+        self._save_undo()
+
     def _undo(self) -> str:
         if not self.undo_stack:
             return "There's nothing to undo."
+        entry = self.undo_stack.pop()
+        try:
+            too_old = self.now_fn() - datetime.fromisoformat(entry["ts"]) > UNDO_MAX_AGE
+        except (KeyError, ValueError, TypeError):
+            too_old = True
+        if too_old:
+            self.undo_stack.clear()          # everything below it is older still
+            self._save_undo()
+            return "That change was made more than a day ago, so I won't undo it."
+        self._save_undo()
         self._backup()
-        return self.undo_stack.pop()()
+        try:
+            return self._apply_undo(entry)
+        except (KeyError, TypeError, ValueError):
+            return "I couldn't undo that."
+
+    def _apply_undo(self, entry):
+        op = entry["op"]
+        if op == "remove":
+            return self._undo_added(entry["id"], entry["title"])
+        if op == "readd":
+            return self._undo_deleted([Item(**d) for d in entry["items"]])
+        if op == "restore":
+            return self._undo_fields(entry["id"], entry["old"], entry["title"])
+        return "I couldn't undo that."
 
     def _undo_added(self, item_id, title):
         storage.delete_item(item_id, self.path)
@@ -331,7 +378,8 @@ class Assistant:
 
     def _undo_deleted(self, items):
         for item in items:
-            storage.add_item(item, self.path)
+            if storage.get_item(item.id, self.path) is None:      # never duplicate an item
+                storage.add_item(item, self.path)
         if len(items) == 1:
             return f'Brought back "{items[0].title}".'
         return f"Brought back {len(items)} items."
@@ -363,7 +411,7 @@ class Assistant:
     def _do_add(self, item, note=""):
         self._backup()
         storage.add_item(item, self.path)
-        self.undo_stack.append(lambda: self._undo_added(item.id, item.title))
+        self._push_undo({"op": "remove", "id": item.id, "title": item.title})
         return (f'Added "{item.title}": {_when(item)}.{note}\n'
                 f'Reminders: {_reminder_summary(item, self.now_fn())}. (say "undo" to remove it)')
 
@@ -405,7 +453,7 @@ class Assistant:
         self._backup()
         if not storage.delete_item(item.id, self.path):
             return "That item is already gone."
-        self.undo_stack.append(lambda: self._undo_deleted([item]))
+        self._push_undo({"op": "readd", "items": [asdict(item)]})
         return f'Deleted "{item.title}". (say "undo" to bring it back)'
 
     def _delete_all(self, cmd, now):
@@ -426,7 +474,7 @@ class Assistant:
         self._backup()
         for item in items:
             storage.delete_item(item.id, self.path)
-        self.undo_stack.append(lambda: self._undo_deleted(items))
+        self._push_undo({"op": "readd", "items": [asdict(i) for i in items]})
         return (f"Deleted {_plural(len(items), 'item')} from {_day_phrase(day, now.date())}. "
                 '(say "undo" to bring them back)')
 
@@ -441,7 +489,7 @@ class Assistant:
             return f'"{chosen.title}" is already marked done.'
         self._backup()
         storage.update_item(chosen.id, path=self.path, status="done")
-        self.undo_stack.append(lambda: self._undo_fields(chosen.id, {"status": "pending"}, chosen.title))
+        self._push_undo({"op": "restore", "id": chosen.id, "old": {"status": "pending"}, "title": chosen.title})
         reply = f'Marked done: "{chosen.title}". (say "undo" to reverse it)'
         if others:
             reply += (f"\n(I found {_plural(len(others), 'other')} with that name; "
@@ -477,7 +525,7 @@ class Assistant:
         self._backup()
         storage.update_item(chosen.id, path=self.path, **changes)
         old = {key: getattr(chosen, key) for key in changes}
-        self.undo_stack.append(lambda: self._undo_fields(chosen.id, old, chosen.title))
+        self._push_undo({"op": "restore", "id": chosen.id, "old": old, "title": chosen.title})
         reply = (f'Updated "{chosen.title}": {_when(chosen)} -> {_when(new)}. '
                  '(say "undo" to reverse it)')
         if others:
