@@ -4,8 +4,10 @@ Plain Python, no dependencies. Returns None when it can't understand a phrase, s
 app can ask the user instead of silently guessing.
 
 Rules:
-- A weekday name means the first such day AFTER today ("Thursday" said on a Thursday = next
-  week; say "today" for today).
+- A bare weekday name means the first such day AFTER today ("Thursday" said on a Thursday =
+  next week; say "today" for today).
+- "this Friday" means the coming Friday (today counts). "next Friday" means Friday of next
+  calendar week (weeks start on Monday).
 - A month and day with no year means its next occurrence (today counts).
 - An ISO date (2026-11-08) passes through unchanged.
 """
@@ -70,7 +72,15 @@ def _resolve(s: str, today: date):
             return None
         return (today + timedelta(days=n * (7 if m[2].startswith("week") else 1))).isoformat()
 
-    m = re.fullmatch(r"(?:next )?([a-z]+)", s)
+    m = re.fullmatch(r"(this|next) ([a-z]+)", s)
+    if m and _weekday_index(m[2]) is not None:
+        index = _weekday_index(m[2])
+        if m[1] == "this":                                    # the coming one, today included
+            return (today + timedelta(days=(index - today.weekday()) % 7)).isoformat()
+        monday_next = today - timedelta(days=today.weekday()) + timedelta(days=7)
+        return (monday_next + timedelta(days=index)).isoformat()   # that day, next week
+
+    m = re.fullmatch(r"([a-z]+)", s)                          # bare weekday
     if m and _weekday_index(m[1]) is not None:
         return next_weekday(today, _weekday_index(m[1])).isoformat()
 
@@ -95,7 +105,7 @@ def resolve_date(text, today=None):
         return None
     today = today or date.today()
     s = re.sub(r"[,.!?]", " ", str(text).lower())
-    s = re.sub(r"\b(on|the|this|coming)\b", " ", s)
+    s = re.sub(r"\b(on|the|coming)\b", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     if not s:
         return None

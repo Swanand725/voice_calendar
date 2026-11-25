@@ -6,61 +6,37 @@ Usage (from the project root, with Ollama running):
     python benchmark.py llama3.2:3b --limit 10        # quick smoke test
     python benchmark.py llama3.2:3b --today 2026-11-05   # repeatable dates
     python benchmark.py llama3.2:3b --no-checks       # raw model only, safety net off
+    python benchmark.py llama3.2:3b --phrases tests/heldout_phrases.json
 
 The model returns the date as spoken ("Sunday", "October 5th"); app/dates.py turns it into a
 real date and app/checks.py catches wrong actions and invented values, so the benchmark
 measures the whole pipeline. Every phrase is a fresh request (no shared chat history), with
 the reply forced into a JSON schema and temperature 0. Standard library only.
+
+Phrase files: each entry has "phrase" plus the expected "action", "title", "date", "time".
+  - "title" may be a list of acceptable answers; null means "no title" (not checked for list).
+  - An entry with a "gap" text instead of expected values is a feature the app doesn't have
+    yet: it is run and shown, but not scored.
+  - Expected dates are tokens, resolved at run time:
+      today | tomorrow | +N          days from today
+      next:sunday                    first Sunday AFTER today
+      this:friday                    first Friday on or after today
+      nextweek:friday                Friday of next calendar week (weeks start Monday)
+      md:10-05                       next time October 5th occurs
 """
 import argparse
 import json
 import statistics
-import time
 import urllib.error
-import urllib.request
 from datetime import date, timedelta
 from difflib import SequenceMatcher
 from pathlib import Path
 
 from app.checks import finalize
+from app.parser import OLLAMA_URL, ask, build_system_prompt
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
 PHRASES_FILE = Path(__file__).resolve().parent / "tests" / "benchmark_phrases.json"
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-ACTIONS = ["add", "delete", "update", "complete", "list", "info"]
-
-_NULLABLE_STR = {"anyOf": [{"type": "string"}, {"type": "null"}]}
-SCHEMA = {
-    "type": "object",
-    "properties": {
-        "action": {"type": "string", "enum": ACTIONS},
-        "title": _NULLABLE_STR,
-        "date_text": _NULLABLE_STR,
-        "time": _NULLABLE_STR,
-    },
-    "required": ["action", "title", "date_text", "time"],
-    "additionalProperties": False,
-}
-
-RULES = """You convert spoken calendar requests into one JSON object with the keys action, title, date_text, time.
-
-Actions:
-- add: create a new event, task, assignment, or reminder
-- delete: remove one (also: cancel, get rid of)
-- update: change an existing one (also: move, reschedule, change); date_text and time hold the NEW values
-- complete: mark one as done (also: check, check off, finished). "check the X" means complete X
-- list: show what is scheduled on a day (or everything if no day is given)
-- info: ask about one existing item (when is it, what time, how long until it)
-
-Rules:
-- title: the name of the item, without filler words. Keep quoted names as spoken. Use null for list.
-- date_text: the date words exactly as spoken (for example "tomorrow", "Sunday", "October 5th", "in 2 days"), or null if no day was named. Do NOT convert it into a numeric date.
-- time: 24-hour HH:MM, or null if no time was said. Without am/pm, hours 1-6 mean PM and 7-11 mean AM; noon is 12:00.
-- Never invent a date or a time that was not said.
-- delete, complete, and info normally have date_text and time null.
-- Reply with the JSON object only."""
-
-
 # -------------------------------------------- expected dates (independent logic) ---
 # Kept separate from app/dates.py on purpose, so the resolver is checked against a
 # second implementation instead of against itself.
@@ -76,7 +52,7 @@ def next_month_day(today: date, month: int, day: int) -> date:
 
 
 def resolve_date_token(token, today: date):
-    """Turn the expected-date tokens in the phrase file into real dates for this run."""
+    """Turn the expected-date tokens in the phrase files into real dates for this run."""
     if token is None:
         return None
     if token == "today":
@@ -87,66 +63,30 @@ def resolve_date_token(token, today: date):
         return (today + timedelta(days=int(token[1:]))).isoformat()
     if token.startswith("next:"):
         return next_weekday(today, token[5:]).isoformat()
+    if token.startswith("this:"):
+        return (today + timedelta(days=(WEEKDAYS.index(token[5:]) - today.weekday()) % 7)).isoformat()
+    if token.startswith("nextweek:"):
+        monday_next = today - timedelta(days=today.weekday()) + timedelta(days=7)
+        return (monday_next + timedelta(days=WEEKDAYS.index(token[9:]))).isoformat()
     if token.startswith("md:"):
         month, day = (int(x) for x in token[3:].split("-"))
         return next_month_day(today, month, day).isoformat()
     return token
 
 
-# ---------------------------------------------------------------- prompt ---
-
-def build_system_prompt() -> str:
-    def ex(phrase, action, title, date_text, time_):
-        obj = {"action": action, "title": title, "date_text": date_text, "time": time_}
-        return f'"{phrase}" -> {json.dumps(obj)}'
-
-    examples = [
-        ex("put piano lesson on my calendar tomorrow at 4", "add", "piano lesson", "tomorrow", "16:00"),
-        ex("cancel the car wash", "delete", "car wash", None, None),
-        ex("I finished the laundry task", "complete", "laundry", None, None),
-        ex("check the taxes assignment", "complete", "taxes", None, None),
-        ex("what do I have today", "list", None, "today", None),
-        ex("show me everything I have coming up", "list", None, None, None),
-        ex("when is my piano lesson", "info", "piano lesson", None, None),
-        ex("move the piano lesson to 5", "update", "piano lesson", None, "17:00"),
-        ex("change the car wash to Saturday", "update", "car wash", "Saturday", None),
-    ]
-    return RULES + "\n\nExamples:\n" + "\n".join(examples)
-
-
-# ---------------------------------------------------------------- ollama ---
-
-def ask(model: str, system: str, phrase: str):
-    body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": phrase},
-        ],
-        "stream": False,
-        "format": SCHEMA,
-        "options": {"temperature": 0},
-        "keep_alive": "30m",
-    }
-    req = urllib.request.Request(
-        OLLAMA_URL, data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"})
-    start = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        data = json.load(resp)
-    return data["message"]["content"], time.perf_counter() - start
-
-
 # --------------------------------------------------------------- scoring ---
 
-def title_ok(expected, got) -> bool:
-    if expected is None:                  # e.g. list: title isn't checked
-        return True
+def title_ok(expected, got, action) -> bool:
+    if expected is None:                  # list: title isn't checked; otherwise it must be empty
+        return True if action == "list" else got is None
     if not got:
         return False
-    e, g = expected.lower().strip(), got.lower().strip()
-    return (e in g or (len(g) >= 3 and g in e)
-            or SequenceMatcher(None, e, g).ratio() >= 0.8)
+    g = got.lower().strip()
+    for option in (expected if isinstance(expected, list) else [expected]):
+        e = option.lower().strip()
+        if e in g or (len(g) >= 3 and g in e) or SequenceMatcher(None, e, g).ratio() >= 0.8:
+            return True
+    return False
 
 
 def show(d) -> str:
@@ -154,8 +94,10 @@ def show(d) -> str:
 
 
 def run_model(model, system, cases, today, use_checks=True):
+    scored_cases = [c for c in cases if "gap" not in c]
     mode = "safety net on" if use_checks else "RAW model, safety net off"
-    print(f"\n=== {model} ===  {len(cases)} phrases, today = {today.isoformat()}, {mode}")
+    print(f"\n=== {model} ===  {len(scored_cases)} scored + {len(cases) - len(scored_cases)} "
+          f"known-gap phrases, today = {today.isoformat()}, {mode}")
     print("Warming up (loads the model and caches the prompt)...")
     try:
         ask(model, system, "what do I have today")
@@ -169,37 +111,50 @@ def run_model(model, system, cases, today, use_checks=True):
     counts = {"action": 0, "title": 0, "date": 0, "time": 0, "overall": 0}
     bad_json = 0
     corrected = 0
-    times, failures = [], []
+    times, failures, observed = [], [], []
     print("  ", end="", flush=True)
 
     for i, case in enumerate(cases, 1):
-        expected = {
-            "action": case["action"],
-            "title": case.get("title"),
-            "date": resolve_date_token(case.get("date"), today),
-            "time": case.get("time"),
-        }
+        gap = case.get("gap")
+        expected = None
+        if not gap:
+            expected = {
+                "action": case["action"],
+                "title": case.get("title"),
+                "date": resolve_date_token(case.get("date"), today),
+                "time": case.get("time"),
+            }
         try:
             content, secs = ask(model, system, case["phrase"])
         except Exception as e:                      # timeout etc.
-            failures.append((i, case["phrase"], expected, f"ERROR: {e}", []))
+            (observed if gap else failures).append(
+                (i, case["phrase"], gap, f"ERROR: {e}") if gap else (i, case["phrase"], expected, f"ERROR: {e}", []))
             print("E", end="", flush=True)
             continue
-        times.append(secs)
+        if not gap:
+            times.append(secs)
 
         try:
             raw = json.loads(content)
             got, notes = finalize(raw, case["phrase"], today, use_checks)
         except (json.JSONDecodeError, AttributeError):
-            bad_json += 1
-            failures.append((i, case["phrase"], expected, f"INVALID JSON: {content[:80]}", []))
-            print("x", end="", flush=True)
+            if gap:
+                observed.append((i, case["phrase"], gap, f"INVALID JSON: {content[:80]}"))
+            else:
+                bad_json += 1
+                failures.append((i, case["phrase"], expected, f"INVALID JSON: {content[:80]}", []))
+            print("-" if gap else "x", end="", flush=True)
             continue
-        corrected += bool(notes)
 
+        if gap:
+            observed.append((i, case["phrase"], gap, got))
+            print("-", end="", flush=True)
+            continue
+
+        corrected += bool(notes)
         ok = {
             "action": got["action"] == expected["action"],
-            "title": title_ok(expected["title"], got["title"]),
+            "title": title_ok(expected["title"], got["title"], expected["action"]),
             "date": got["date"] == expected["date"],
             "time": got["time"] == expected["time"],
         }
@@ -212,9 +167,9 @@ def run_model(model, system, cases, today, use_checks=True):
             failures.append((i, case["phrase"], expected, got, notes))
             print("x", end="", flush=True)
 
-    n = len(cases)
+    n = len(scored_cases)
     pct = lambda c: f"{c}/{n} ({100 * c / n:.0f}%)"
-    print("\n")
+    print("\n   (. correct   x wrong   - known gap, not scored)\n")
     print(f"All fields correct : {pct(counts['overall'])}")
     print(f"  action           : {pct(counts['action'])}")
     print(f"  title            : {pct(counts['title'])}")
@@ -237,8 +192,19 @@ def run_model(model, system, cases, today, use_checks=True):
             else:
                 said = f'   (date said: "{got["date_text"]}")' if got.get("date_text") else ""
                 print(f"       got:      {show(got)}{said}")
+                if got.get("reason"):
+                    print(f"       asks:     {got['reason']}")
                 for note in notes:
                     print(f"       checks:   {note}")
+
+    if observed:
+        print(f"\nKnown gaps, not scored ({len(observed)}) -- what the pipeline produced   [action | title | date | time]")
+        for i, phrase, reason, got in observed:
+            print(f"  #{i}  \"{phrase}\"")
+            print(f"       gap: {reason}")
+            print(f"       got: {got if isinstance(got, str) else show(got)}")
+            if not isinstance(got, str) and got.get("reason"):
+                print(f"       asks: {got['reason']}")
 
     return {"model": model, "n": n, "avg": statistics.mean(times) if times else 0, **counts}
 
@@ -246,13 +212,14 @@ def run_model(model, system, cases, today, use_checks=True):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("models", nargs="+", help="Ollama model names, e.g. llama3.2:3b")
+    ap.add_argument("--phrases", default=str(PHRASES_FILE), help="phrase file to use")
     ap.add_argument("--limit", type=int, help="only run the first N phrases")
     ap.add_argument("--today", help="pretend today is this date (YYYY-MM-DD)")
     ap.add_argument("--no-checks", action="store_true", help="score the raw model, without the safety net")
     args = ap.parse_args()
 
     today = date.fromisoformat(args.today) if args.today else date.today()
-    cases = json.loads(PHRASES_FILE.read_text(encoding="utf-8"))
+    cases = json.loads(Path(args.phrases).read_text(encoding="utf-8"))
     if args.limit:
         cases = cases[:args.limit]
     system = build_system_prompt()

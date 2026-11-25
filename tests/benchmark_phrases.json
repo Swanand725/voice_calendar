@@ -47,5 +47,12 @@
   {"phrase": "List my tasks.", "action": "list", "title": null, "date": null, "time": null},
 
   {"phrase": "When is my exam?", "action": "info", "title": "exam", "date": null, "time": null},
-  {"phrase": "How long until the team meeting?", "action": "info", "title": "team meeting", "date": null, "time": null}
+  {"phrase": "How long until the team meeting?", "action": "info", "title": "team meeting", "date": null, "time": null},
+
+  {"phrase": "Clear my schedule for today.", "action": "delete", "title": null, "date": "today", "time": null},
+  {"phrase": "Wipe my calendar for tomorrow.", "action": "delete", "title": null, "date": "tomorrow", "time": null},
+  {"phrase": "Clear everything on Friday.", "action": "delete", "title": null, "date": "next:friday", "time": null},
+  {"phrase": "Empty my schedule for Saturday.", "action": "delete", "title": null, "date": "next:saturday", "time": null},
+  {"phrase": "Clear the dentist appointment.", "action": "delete", "title": "dentist appointment", "date": null, "time": null},
+  {"phrase": "Clear my schedule.", "action": "clarify", "title": null, "date": null, "time": null}
 ]

@@ -25,9 +25,21 @@ def test_in_n_days_and_weeks():
 def test_weekdays_mean_the_next_one_after_today():
     assert resolve_date("Sunday", THU) == "2026-11-08"
     assert resolve_date("on Monday", THU) == "2026-11-09"
-    assert resolve_date("next friday", THU) == "2026-11-06"
+    assert resolve_date("Friday", THU) == "2026-11-06"
     assert resolve_date("thursday", THU) == "2026-11-12"      # today is Thursday -> next week
     assert resolve_date("tue", TUE) == "2026-11-03"
+
+
+def test_this_and_next_weekday():
+    assert resolve_date("this Friday", THU) == "2026-11-06"     # the coming Friday
+    assert resolve_date("this Thursday", THU) == "2026-11-05"   # today counts
+    assert resolve_date("this Sunday", THU) == "2026-11-08"
+    assert resolve_date("next Friday", THU) == "2026-11-13"     # Friday of next week
+    assert resolve_date("next Monday", THU) == "2026-11-09"
+    assert resolve_date("next Thursday", THU) == "2026-11-12"
+    assert resolve_date("this Tuesday", TUE) == "2026-10-27"
+    assert resolve_date("next Tuesday", TUE) == "2026-11-03"
+    assert resolve_date("next Friday", date(2026, 11, 8)) == "2026-11-13"   # said on a Sunday
 
 
 def test_month_and_day_use_next_occurrence():

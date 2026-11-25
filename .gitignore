@@ -160,6 +160,9 @@ env.bak/
 venv.bak/
 data/calendar.json
 data/*.json
+data/*.jsonl
+data/backups/
+data/*.log*
 
 # Spyder project settings
 .spyderproject

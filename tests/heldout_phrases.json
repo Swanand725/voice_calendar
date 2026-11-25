@@ -1,0 +1,33 @@
+[
+  {"phrase": "Hey, throw a dentist appointment on my calendar for next Friday at like 2 in the afternoon.", "action": "add", "title": "dentist appointment", "date": "nextweek:friday", "time": "14:00"},
+  {"phrase": "Remind me to pick up groceries tomorrow, preferably sometime in the evening.", "action": "add", "title": "pick up groceries", "date": "tomorrow", "time": null},
+  {"phrase": "I need to get my car oil changed. Put that down for Saturday morning.", "action": "add", "title": "oil change", "date": "next:saturday", "time": null},
+  {"phrase": "Oh, and add a quick reminder to call mom. Don't really have a time for that yet.", "action": "add", "title": "call mom", "date": null, "time": null},
+  {"phrase": "Schedule a study session for, uh, Wednesday, maybe around 6:30, for about two hours.", "action": "add", "title": "study session", "date": "next:wednesday", "time": "18:30", "note": "duration (two hours) is not supported yet"},
+
+  {"phrase": "Actually, ditch that gym thing I had planned for tomorrow.", "action": "delete", "title": "gym", "date": "tomorrow", "time": null},
+  {"phrase": "Get rid of my dentist appointment. I managed to reschedule it myself.", "action": "delete", "title": "dentist appointment", "date": null, "time": null},
+  {"phrase": "Cancel everything I've got scheduled for this Friday. I'm not going anywhere.", "action": "delete", "title": null, "date": "this:friday", "time": null},
+  {"phrase": "Delete the reminder about groceries, I already went shopping.", "action": "delete", "title": ["groceries", "grocery"], "date": null, "time": null},
+
+  {"phrase": "Push my 3 pm back an hour. Something came up.", "gap": "update needs the OLD time (3 pm) and a NEW time computed from it (+1 hour)"},
+  {"phrase": "Move my meeting with Alex to Thursday, same time as before.", "action": "update", "title": "Alex", "date": "next:thursday", "time": null},
+  {"phrase": "That workout I have tomorrow, can you move it to the day after?", "gap": "update needs the OLD date (tomorrow) and a NEW relative date (the day after)"},
+  {"phrase": "Change my dentist appointment from 2 to 3:30, but keep it on Friday.", "gap": "update needs the OLD time (2) and the NEW time (3:30)"},
+  {"phrase": "Actually, make that study session an hour longer. I think I'll need it.", "gap": "duration is not part of the command yet ('an hour longer')"},
+
+  {"phrase": "What have I got going on tomorrow? Am I free after lunch?", "action": "list", "title": null, "date": "tomorrow", "time": null, "note": "scored on the first question only; 'am I free after lunch' is not supported"},
+  {"phrase": "Do I have anything coming up this weekend, or is it pretty much clear?", "gap": "date ranges ('this weekend') are not supported; commands hold a single date"},
+  {"phrase": "When was the last time I scheduled a meeting with Alex?", "action": "info", "title": "Alex", "date": null, "time": null, "note": "scored as an item lookup; 'last time' (history) is not modelled"},
+
+  {"phrase": "Okay so tomorrow I need to go to Walmart, and I also have that gym thing, uh, move the gym thing to 7 instead of 6, and make Walmart sometime after 4.", "gap": "three commands in one sentence (add, update with old and new time, update)"},
+  {"phrase": "Cancel my 10 am tomorrow, actually wait, no, don't cancel it, just push it to noon.", "gap": "self-correction, plus an update with an OLD time (10 am) and NEW time (noon)"},
+  {"phrase": "I need to call the bank sometime this week, move my Friday study session to Saturday, and delete that old grocery reminder while you're at it.", "gap": "three commands in one sentence, one with a date range ('this week')"},
+
+  {"phrase": "Ya get rid of the appointment tomorrow", "action": "delete", "title": "appointment", "date": "tomorrow", "time": null},
+  {"phrase": "Ignore the assignment for tonight and push the 2nd task for today to tomorrow at like 7", "gap": "two commands, and positional references ('the 2nd task for today')"},
+  {"phrase": "Please tell me what I have today", "action": "list", "title": null, "date": "today", "time": null},
+  {"phrase": "What do I gotta do for tomorrow?", "action": "list", "title": null, "date": "tomorrow", "time": null},
+  {"phrase": "Add a task for 7 on Monday, call it \"AI assignment\"", "action": "add", "title": "AI assignment", "date": "next:monday", "time": "19:00"},
+  {"phrase": "I'm done with the AI assignment", "action": "complete", "title": "AI assignment", "date": null, "time": null}
+]
